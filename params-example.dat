@@ -1,0 +1,13 @@
+#length of average (pixels)
+9
+#size of search bin (km/s)
+500.00
+#merge spectral orders (1=yes, 0=no)
+1
+#fill gaps at order edges with points from nearby orders
+1
+#scale output wavelength by a factor (e.g. for unit conversion)
+10.000
+#convert wavelengths in air to vacuum (-1), no conversion (0), or vacuum to air (+1)
+#(this requires units in A, so scale wavelength appropriately first)
+0
