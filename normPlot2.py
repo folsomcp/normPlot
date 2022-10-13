@@ -2,6 +2,7 @@
 #
 # Program for normalizing and plotting an observed spectrum.
 # Can work interactivly with a graphical interface, through matplotlib.
+__version__ = "2.3.1"
 
 #User modifiable parameters
 observationName = 'observed.dat'

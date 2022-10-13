@@ -554,6 +554,9 @@ class newWindowDeg:
             lblOrderNum = ttk.Label(wframe, text='order {:n}:'.format(iorder+1),
                                     style='order{:n}.TLabel'.format(iorder),
                                     justify='right', padding=(4,0,0,0))
+            ToolTip(lblOrderNum, 'wl range {:.2f} - {:.2f}'.format(
+                self.ords.wlOrderStart[iorder], self.ords.wlOrderEnd[iorder]),
+                    waittime = 250)
             txt_degree = tk.StringVar()
             txt_degree.set('{:n}'.format(self.polyDegs[iorder]))
             setTxtDegrees += [txt_degree]
@@ -562,7 +565,8 @@ class newWindowDeg:
             self.setChangePolyDeg += [changePolyDeg]
             inputDegree = ttk.Entry(master=wframe, textvariable=setTxtDegrees[iorder], width=6)
             inputDegree.bind('<Key-Return>', changePolyDeg.updateDegree)
-            #ToolTip(inputDegree, 'set polynomial degree')
+            ToolTip(inputDegree, 'set degree\n wl range {:.2f} - {:.2f}'.format(
+                self.ords.wlOrderStart[iorder], self.ords.wlOrderEnd[iorder]))
             
             #Set up buttons in columns nrows long, then however many columns necessary
             ypos = (iorder//nrows)
@@ -957,7 +961,7 @@ class ToolTip(object):
         self.tw.wm_geometry("+%d+%d" % (x, y))
 
     def hidetip(self):
-        #set self.to to None first, in case the destroy method throws an exception?
+        #set self.tw to None first, in case the destroy method throws an exception?
         tw = self.tw
         self.tw= None
         if tw:

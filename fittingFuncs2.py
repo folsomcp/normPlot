@@ -172,7 +172,7 @@ def readObs(observationName, trimMax=-1.):
         import sys
         sys.exit()
 
-    orders = oderEdges(obsWl)
+    orders = orderEdges(obsWl)
     
     #Weak protection against small/bad values in I or sigma
     meanIapprox = np.mean(obsI)
@@ -198,7 +198,7 @@ def readObs(observationName, trimMax=-1.):
 #Assume order edges occur where there is overlap in the 1D spectrum
 #(i.e. wavelength goes backwards), or where there are unusualy large gaps
 # in the obseration (relative to the mean pixel size in velocity).
-class oderEdges:
+class orderEdges:
     def __init__(self, obsWl):
         #Define spectral order edges by a step backwards in wavelength (velocity)
         #or a step forward in velocity more than 10x the average velocity step size.
