@@ -18,8 +18,8 @@ except ImportError:  #Probably not in matplotlib 3.x
 #from matplotlib.backend_bases import key_press_handler
 import guiControls2 as guic
 
-def makeWin(fig, ax, par, polyDegs, ords, obsWl, obsI, obsSig, obsIavg,
-            bFittable, plObs, setPlObsO, setPlPoly, plFitting):
+def makeWin(fig, ax, ax2, axDummy, par, polyDegs, ords, obsWl, obsI, obsSig, 
+            obsIavg, bFittable, plObs, setPlObsO, setPlPoly, plFitting):
     #Build GUI with tkinter
     root = tk.Tk(className='norm')
     #the className seems to set an icon title
@@ -77,7 +77,7 @@ def makeWin(fig, ax, par, polyDegs, ords, obsWl, obsI, obsSig, obsIavg,
     
     #Create a little event manager-ish object for processing
     #callbacks for view changing buttons
-    bView = guic.bViewFuncs(ax, plObs, canvas)
+    bView = guic.bViewFuncs(ax, ax2, plObs, canvas)
     #and put view changing buttons in their own frame
     viewtools = ttk.Frame(tools)
     viewtools.grid(row=4, column=0, columnspan=8)
@@ -225,6 +225,14 @@ def makeWin(fig, ax, par, polyDegs, ords, obsWl, obsI, obsSig, obsIavg,
                             command=bFitCont.refitCont)
     guic.ToolTip(butFitCont, 'Fit the continuum and plot the results')
     butFitCont.grid(row=4, column=10, sticky=(tk.N, tk.S, tk.E, tk.W))
+    
+    #Show or hide the normalized spectrum as a second panel
+    #added by Shaquann Seadrow
+    bShowNorm = guic.showNormI(canvas, ax, ax2, axDummy)
+    butShowNorm = ttk.Button(master=tools, textvariable=bShowNorm.text,
+                           command=bShowNorm.toggleNormVisable)  
+    guic.ToolTip(butShowNorm, 'Show/hide a preview of the current normalized spectrum.')
+    butShowNorm.grid(row=4, column=8, sticky=tk.E)
 
     #Empty buffer slot for the grid manager to expand
     #(this may be a bit of a hack!)
@@ -262,6 +270,7 @@ def makeWin(fig, ax, par, polyDegs, ords, obsWl, obsI, obsSig, obsIavg,
     #def _quit():
     #    root.quit()     # stops mainloop
     #    root.destroy()  # this is necessary on Windows
-
+    
+    
     #Run the main loop!
     root.mainloop()

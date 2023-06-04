@@ -2,7 +2,7 @@
 #
 # Program for normalizing and plotting an observed spectrum.
 # Can work interactivly with a graphical interface, through matplotlib.
-__version__ = "2.3.1"
+__version__ = "2.4.0"
 
 #User modifiable parameters
 observationName = 'observed.dat'
@@ -50,8 +50,11 @@ elif nObsCol == 6:
     obsWl, obsI, obsV, obsN1, obsN2, obsSig = inSpec
 elif nObsCol == 10:
     obsWl, obsI, obsV, obsN1, obsN2, obsSig = inSpec
-elif nObsCol == 30:
-    obsWl, obsI, obsSig, obsTel = inSpec
+#elif nObsCol == 30:
+#    obsWl, obsI, obsSig, obsTel = inSpec
+else:
+    print('ERROR: found an unexpected number of columns ({:}) in {:}'.format(
+        nObsCol, observationName))
 
 #Read in the exclude from fit wavelength regions, if the file exists
 try:
@@ -115,13 +118,25 @@ if not batchMode:
     #fig = Figure(figsize=(5, 4), dpi=100) #this seems to cause some odd flikering on updates.
     #Setting figsize here seems to be a minor problem, or at least inefficent.
     fig = Figure()
-    ax = fig.add_subplot(111)
+    #Add a dummy axes (not drawn) to hold space for the 1 panel version of the plot
+    axDummy = fig.add_subplot(1,1,1)
+    axDummy.set_visible(False)
     
-    #Plot the spectra
+    #Plot the spectrum in an upper panel
+    ax = fig.add_subplot(2,1,1)
     plObs = ax.plot(obsWl, obsI, 'k', linewidth=1.0) #plot observation
     ax.set_xlabel('Wavelength')
     ax.set_ylabel('Flux')
     
+    #Plot the normalized spectrum in a second panel 
+    ax2 = fig.add_subplot(2,1,2, sharex=ax)
+    #include a horizontal line at 1.0
+    ax2.axhline(y=1.0, xmin=0, xmax=1, ls = '--')
+    plNorm = ax2.plot(obsWl, obsI/np.concatenate(fitIvals), 'k', linewidth=1.0)
+    ax2.set_ylim(0, 1.2)
+    ax2.set_xlabel('Wavelength')
+    ax2.set_ylabel('Norm. Flux')
+
     #Plot individual orders
     setPlObsO=[]
     setPlPoly=[]
@@ -138,7 +153,7 @@ if not batchMode:
 
     #Make the main GUI window, with Tkinter, embedding the matplotlib figure.
     #This runs a main loop untill the window is closed.
-    mainWin.makeWin(fig, ax, par, polyDegs, ords, obsWl, obsI, obsSig, obsIavg,
+    mainWin.makeWin(fig, ax, ax2, axDummy, par, polyDegs, ords, obsWl, obsI, obsSig, obsIavg,
                     bFittable, plObs, setPlObsO, setPlPoly, plFitting)
     
     #Update the final continuum polynomial from the y data
@@ -198,11 +213,11 @@ if nObsCol == 10:
     merWl = ff.scaleWavelength(merWl, par.outputWavelengthScale)
     merWl = ff.convertAirVacuum(merWl, par.outputConvertAirVac)
     ff.writeSpec(observationName+'.norm', 6, merWl, merI, merV, merN1, merN2, merSig)
-#Experimental mode including a telluric spectrum.  The telluric spectrum should already be normalized.
-if nObsCol == 30:
-    if par.bMergeOrd:
-        merWl, merI, merTel = ff.mergeOrders(ords, obsWl, obsI, obsTel)
-    merWl = ff.scaleWavelength(merWl, par.outputWavelengthScale)
-    merWl = ff.convertAirVacuum(merWl, par.outputConvertAirVac)
-    ff.writeSpec(observationName+'.norm', 3, merWl, merI, merTel)
+##Experimental mode including a telluric spectrum.  The telluric spectrum should already be normalized.
+#if nObsCol == 30:
+#    if par.bMergeOrd:
+#        merWl, merI, merTel = ff.mergeOrders(ords, obsWl, obsI, obsTel)
+#    merWl = ff.scaleWavelength(merWl, par.outputWavelengthScale)
+#    merWl = ff.convertAirVacuum(merWl, par.outputConvertAirVac)
+#    ff.writeSpec(observationName+'.norm', 3, merWl, merI, merTel)
 

@@ -148,12 +148,12 @@ def readObs(observationName, trimMax=-1.):
         print('reading {:}, 3 column spectrum, assuming input uncertainties'.format(observationName))
         obsWl, obsI, obsSig = np.loadtxt(observationName, usecols = (0,1,2), skiprows=2, unpack=True)
         inSpec = [obsWl, obsI, obsSig]
-        if np.mean(obsSig) > 0.1*np.mean(obsI):
-            print('experimental: treating 3rd colmun as SPIRou telluric spectrum')
-            obsWl, obsI, obsTel = np.loadtxt(observationName, usecols = (0,1,2), skiprows=2, unpack=True)
-            obsSig = np.std(obsI)*np.ones(obsI.shape)
-            inSpec = [obsWl, obsI, obsSig, obsTel]
-            nObsCol = 30
+        #if np.mean(obsSig) > 0.1*np.mean(obsI):
+        #    print('experimental: treating 3rd colmun as SPIRou telluric spectrum')
+        #    obsWl, obsI, obsTel = np.loadtxt(observationName, usecols = (0,1,2), skiprows=2, unpack=True)
+        #    obsSig = np.std(obsI)*np.ones(obsI.shape)
+        #    inSpec = [obsWl, obsI, obsSig, obsTel]
+        #    nObsCol = 30
     elif nObsCol == 6:
         print('reading {:}, 6 column spectrum, assuming ESPaDOnS format'.format(observationName))
         obsWl, obsI, obsV, obsN1, obsN2, obsSig = np.loadtxt(observationName, usecols = (0,1,2,3,4,5), skiprows=2, unpack=True)

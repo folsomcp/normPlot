@@ -13,8 +13,9 @@ import time
 #Functions for panning and Zooming
 #A little event manager thing for dealing with callbacks
 class bViewFuncs:
-    def __init__(self, ax, plObs, canvas):
+    def __init__(self, ax, ax2, plObs, canvas):
         self.ax = ax
+        self.ax2 = ax2
         self.plObs = plObs
         self.canvas = canvas
         self.zoomRecActive = False
@@ -29,6 +30,7 @@ class bViewFuncs:
         yspan = ymax-ymin
         self.ax.set_xlim(xmin-xspan*fracSpace, xmax+xspan*fracSpace)
         self.ax.set_ylim(ymin-yspan*fracSpace, ymax+yspan*fracSpace)
+        self.ax2.set_ylim(0.0, 1.2)
         self.canvas.draw()
         return
     def autoScaleY(self, *event):
@@ -39,6 +41,7 @@ class bViewFuncs:
         ymax = np.max(self.plObs[0].get_ydata()[iInViewX])
         yspan = ymax-ymin
         self.ax.set_ylim(ymin-yspan*fracSpace, ymax+yspan*fracSpace)        
+        self.ax2.set_ylim(0.0, 1.2)
         self.canvas.draw()
         return
     def zoomIn(self, *event):
@@ -50,6 +53,10 @@ class bViewFuncs:
         modFracZoom = fracZoom/(1.+2.*fracZoom) #modify so zoom in reverses zoom out exactly
         self.ax.set_xlim(xmin+xspan*modFracZoom, xmax-xspan*modFracZoom)
         self.ax.set_ylim(ymin+yspan*modFracZoom, ymax-yspan*modFracZoom)
+        #update the second axes
+        ymin2, ymax2 = self.ax2.get_ylim()
+        yspan2 = ymax2-ymin2
+        self.ax2.set_ylim(ymin2+yspan2*modFracZoom, ymax2-yspan2*modFracZoom)
         self.canvas.draw()
         return
     def zoomOut(self, *event):
@@ -60,6 +67,10 @@ class bViewFuncs:
         yspan = ymax-ymin
         self.ax.set_xlim(xmin-xspan*fracZoom, xmax+xspan*fracZoom)
         self.ax.set_ylim(ymin-yspan*fracZoom, ymax+yspan*fracZoom)
+        #update the second axes
+        ymin2, ymax2 = self.ax2.get_ylim()
+        yspan2 = ymax2-ymin2
+        self.ax2.set_ylim(ymin2-yspan2*fracZoom, ymax2+yspan2*fracZoom)
         self.canvas.draw()
         return
     def panLeft(self, *event):
@@ -81,6 +92,10 @@ class bViewFuncs:
         ymin, ymax = self.ax.get_ylim()
         yspan = ymax-ymin
         self.ax.set_ylim(ymin+yspan*fracPan, ymax+yspan*fracPan)
+        ##update the second axes
+        #ymin2, ymax2 = self.ax2.get_ylim()
+        #yspan2 = ymax2-ymin2
+        #self.ax2.set_ylim(ymin2+yspan2*fracPan, ymax2+yspan2*fracPan)
         self.canvas.draw()
         return
     def panDown(self, *event):
@@ -88,6 +103,10 @@ class bViewFuncs:
         ymin, ymax = self.ax.get_ylim()
         yspan = ymax-ymin
         self.ax.set_ylim(ymin-yspan*fracPan, ymax-yspan*fracPan)
+        ##update the second axes
+        #ymin2, ymax2 = self.ax2.get_ylim()
+        #yspan2 = ymax2-ymin2
+        #self.ax2.set_ylim(ymin2-yspan2*fracPan, ymax2-yspan2*fracPan)
         self.canvas.draw()
         return
         #Optionally check if the event is not comming from a widget we don't want to respond to
@@ -110,6 +129,8 @@ class bViewFuncs:
             self.canvasWidget.config(cursor='crosshair')
         return
     def zoomRecDeactivate(self):
+        #When finished a rectangle zoom apply the zoom and re-set buttons etc.
+        marginFrac = 0.1 #allow the user to click outside the plot by this margin
         self.canvasWidget.bind('<Button-1>', self.oldBindClick)
         self.canvasWidget.bind('<Button-3>', self.oldBindClick3)
         self.canvasWidget.config(cursor=self.oldCursor)
@@ -117,39 +138,72 @@ class bViewFuncs:
         #when deactivating also set the plot view to the selected range
         if self.x1rec > 0:
             #get the canvas position in window pixel coordinates
-            x0full, x1full = self.canvas.figure.gca().bbox.intervalx
-            y0inv, y1inv = self.canvas.figure.gca().bbox.intervaly
-            #and correct for matplotlib using y in the opposide direction from tk
-            height = self.canvas.figure.bbox.height
-            y0full = height - y1inv
-            y1full = height - y0inv
-            axesxrange = x1full - x0full
-            axesyrange = y1full - y0full
-            #get the current view range in data coordinates
-            axdatax0, axdatax1, axdatay0, axdatay1 = self.canvas.figure.gca().axis()
-            dataxrange = axdatax1 - axdatax0
-            datayrange = axdatay1 - axdatay0
-            #convert the selected window pixel range into data coordinates
-            datax0 = (self.x0rec - x0full)/(axesxrange)*(dataxrange) + axdatax0
-            datax1 = (self.x1rec - x0full)/(axesxrange)*(dataxrange) + axdatax0
-            datay0 = (self.y0rec - y0full)/(axesyrange)*(-datayrange) + axdatay1
-            datay1 = (self.y1rec - y0full)/(axesyrange)*(-datayrange) + axdatay1
-            #set the plotted range into the selected range in data coordiantes
-            if abs(datax1 - datax0) > 0. and abs(datay1 - datay0) > 0.:
-                self.ax.set_xlim(min(datax0, datax1), max(datax0, datax1))
-                self.ax.set_ylim(min(datay0, datay1), max(datay0, datay1))
-                self.canvas.draw()
+            ax1x0, ax1x1, ax1y0, ax1y1 = getAxesCornersFromBbox(
+                self.canvas.figure.axes[1], self.canvas)
+            ax2x0, ax2x1, ax2y0, ax2y1 = getAxesCornersFromBbox(
+                self.canvas.figure.axes[2], self.canvas)
+            #Allow a margin around the actual frame where clicking will still work
+            ax1x0, ax1x1, ax1y0, ax1y1 = self.addMarginToCorners(
+                ax1x0, ax1x1, ax1y0, ax1y1, marginFrac)
+            ax2x0, ax2x1, ax2y0, ax2y1 = self.addMarginToCorners(
+                ax2x0, ax2x1, ax2y0, ax2y1, marginFrac)
+
+            #If the first click was inside the frame of the top axes object,
+            #or else in the frame of the bottom axes object
+            if (self.x0rec >= ax1x0 and self.x0rec <= ax1x1
+                and self.y0rec >= ax1y0 and self.y0rec <= ax1y1):
+                #Get the corners of the zoom rectangle (places clicked)
+                #in data coordinates
+                datax0, datay0 = getDataCoordsFromPixels(
+                    self.canvas.figure.axes[1], self.canvas, self.x0rec, self.y0rec)
+                datax1, datay1 = getDataCoordsFromPixels(
+                    self.canvas.figure.axes[1], self.canvas, self.x1rec, self.y1rec)
+                #set the plotted range into the selected range in data coordiantes
+                if (abs(datax1 - datax0) > 0. and abs(datay1 - datay0) > 0.):
+                    self.ax.set_xlim(min(datax0, datax1), max(datax0, datax1))
+                    self.ax.set_ylim(min(datay0, datay1), max(datay0, datay1))
+                    self.canvas.draw()
+            elif(self.x0rec >= ax2x0 and self.x0rec <= ax2x1
+                 and self.y0rec >= ax2y0 and self.y0rec <= ax2y1):
+                #Get the corners of the zoom rectangle (places clicked)
+                #in data coordinates
+                datax0, datay0 = getDataCoordsFromPixels(
+                    self.canvas.figure.axes[2], self.canvas, self.x0rec, self.y0rec)
+                datax1, datay1 = getDataCoordsFromPixels(
+                    self.canvas.figure.axes[2], self.canvas, self.x1rec, self.y1rec)
+                #set the plotted range into the selected range in data coordiantes
+                if (abs(datax1 - datax0) > 0. and abs(datay1 - datay0) > 0.):
+                    self.ax2.set_xlim(min(datax0, datax1), max(datax0, datax1))
+                    self.ax2.set_ylim(min(datay0, datay1), max(datay0, datay1))
+                    self.canvas.draw()
         return
     def onClickRec(self, event):
+        #when pressing mouse 1 while selecting zoom rectangle
+        marginFrac = 0.1 #allow the user to click outside the plot by this margin
         #On the first click start drawing a selection rectangle
         if self.numClick == 0:
-            self.numClick += 1
-            self.oldBindMove = self.canvasWidget.bind('<Motion>')
-            self.canvasWidget.bind('<Motion>', self.onMoveRec)
-            self.x0rec = event.x
-            self.y0rec = event.y
-            self.lastrect = self.canvasWidget.create_rectangle(
-                self.x0rec, self.y0rec, self.x0rec+1, self.y0rec+1, width=1)
+            ax1x0, ax1x1, ax1y0, ax1y1 = getAxesCornersFromBbox(
+                self.canvas.figure.axes[1], self.canvas)
+            ax2x0, ax2x1, ax2y0, ax2y1 = getAxesCornersFromBbox(
+                self.canvas.figure.axes[2], self.canvas)
+            #Allow a margin around the actual frame where clicking will still work
+            ax1x0, ax1x1, ax1y0, ax1y1 = self.addMarginToCorners(
+                ax1x0, ax1x1, ax1y0, ax1y1, marginFrac)
+            ax2x0, ax2x1, ax2y0, ax2y1 = self.addMarginToCorners(
+                ax2x0, ax2x1, ax2y0, ax2y1, marginFrac)
+            #Only activate if the user clicked inside one of the plotted frames
+            if ((event.x >= ax1x0 and event.x <= ax1x1
+                 and event.y >= ax1y0 and event.y <= ax1y1)
+                or (event.x >= ax2x0 and event.x <= ax2x1
+                 and event.y >= ax2y0 and event.y <= ax2y1)):
+                
+                self.numClick += 1
+                self.oldBindMove = self.canvasWidget.bind('<Motion>')
+                self.canvasWidget.bind('<Motion>', self.onMoveRec)
+                self.x0rec = event.x
+                self.y0rec = event.y
+                self.lastrect = self.canvasWidget.create_rectangle(
+                    self.x0rec, self.y0rec, self.x0rec+1, self.y0rec+1, width=1)
         #On the second click deactivate and finish the zoom
         else:
             self.x1rec = event.x
@@ -173,7 +227,54 @@ class bViewFuncs:
         self.lastrect = self.canvasWidget.create_rectangle(
             self.x0rec, self.y0rec, x1, y1, width=1)
         return
-              
+    #Extra helper functions only used above
+    def addMarginToCorners(self, x0, x1, y0, y1, margin):
+        #add a fractional margin to a box of x and y values
+        xdiff = max(x0, x1) - min(x0, x1)
+        ydiff = max(y0, y1) - min(y0, y1)
+        if x0 <= x1:
+            mx0 = x0 - xdiff*margin
+            mx1 = x1 + xdiff*margin
+        else:
+            mx0 = x0 + xdiff*margin
+            mx1 = x1 - xdiff*margin
+        if y0 <= y1:
+            my0 = y0 - ydiff*margin
+            my1 = y1 + ydiff*margin
+        else:
+            my0 = y0 + ydiff*margin
+            my1 = y1 - ydiff*margin
+        return mx0, mx1, my0, my1
+
+#Some helper functions for working with window/cursor positions
+def getAxesCornersFromBbox(axes, canvas):
+    #Get this axes object's position in window pixel coordinates.
+    #first get the axes corner positions from matplotlib
+    x0full, x1full = axes.bbox.intervalx
+    y0inv, y1inv = axes.bbox.intervaly
+    #Tkinter uses units from the top left, while matplotlib provides units from 
+    #the bottom left. So we need to flip matplotlilb's provided values.
+    height = canvas.figure.bbox.height
+    y0full = height - y1inv
+    y1full = height - y0inv
+    return x0full, x1full, y0full, y1full
+
+def getDataCoordsFromPixels(axes, canvas, xpix, ypix):
+    #Get the data coordinates corresponding to the given window coordinates,
+    #for data coordinates in the system of the given axes object.
+    #first get axes objects pixel coordinates
+    axx0, axx1, axy0, axy1 = getAxesCornersFromBbox(axes, canvas)
+    axesxrange = axx1 - axx0
+    axesyrange = axy1 - axy0
+    #then get the current view range in data coordinates
+    axdatax0, axdatax1, axdatay0, axdatay1 = axes.axis()
+    dataxrange = axdatax1 - axdatax0
+    datayrange = axdatay1 - axdatay0
+    #finally convert the selected window pixel range into data coordinates
+    datax0 = (xpix - axx0)/(axesxrange)*(dataxrange) + axdatax0
+    datay0 = (ypix - axy0)/(axesyrange)*(-datayrange) + axdatay1
+    return datax0, datay0
+
 
 #Recalculate the running average, using the usere's input values
 class changeRunningAvg:
@@ -417,6 +518,7 @@ class runFitCont:
                  obsWl, obsI, obsSig, ords, bFittable, obsIavg,
                  par, polyDegs, setPlPoly, plFitting):
         self.canvas = canvas
+        self.ax2 = self.canvas.figure.axes[2]
         self.chRunningAvg = changeRunningAvg
         self.chBinSize = changeBinSize
         self.obsWl = obsWl
@@ -455,11 +557,61 @@ class runFitCont:
                 dline.set_data(self.obsWl[self.ords.iOrderStart[i]:self.ords.iOrderEnd[i]+1],
                                fitIvals[i])
             i += 1
-
         #re-draw points used in the fit
         for dline in self.plFitting:
             dline.set_data(fittingWl, fittingI)
+        
+        #Apply the normalization to the plot of normalized spectrum
+        #(mostly from Shaquann Seadrow)
+        #first get a 1d verson of the continuum polynomial
+        fitIvalsFlat = np.concatenate(fitIvals)
+        merWl = self.obsWl
+        merI = obsI_norm = self.obsI/fitIvalsFlat
+        #Optionally merge spectral orders, if that is option is set.        
+        if self.par.bMergeOrd:
+            merWl, merI = ff.mergeOrders(self.ords, self.obsWl, obsI_norm)
+        #Update the data for the line(s) plotted for the normalized spectrum
+        listNormLine = list(self.ax2.get_lines())
+        #(the first line object should be a flat line at 1, so skip it)
+        for i in range(1,len(listNormLine)):
+            listNormLine[i].set_data(merWl, merI)
+        
         self.canvas.draw()
+        return
+
+#Controls for showing or hiding the second plot of the normalized spectrum
+#Two plots are stacked vertically by default, but when the plot of the 
+#normalized spectrum is hidden the first plot should fill the window.
+#added by Shaquann Seadrow
+class showNormI:
+    def __init__(self, canvas, ax1, ax2, axDummy):
+        self.canvas = canvas
+        self.ax1 = ax1
+        self.ax2 = ax2
+        self.axDummy = axDummy
+        self.subplotspe2P = ax1.get_subplotspec()
+        self.subplotspe1P = axDummy.get_subplotspec()
+        self.isVisible = True
+        #To make the text on the button something we can update,
+        #use a tk stringVar object rather than a regular string.
+        self.text = tk.StringVar(value='hide norm')
+    
+    def toggleNormVisable(self):
+        #The normalization is applied to the data in this plot inside 
+        #the runFitCont.refitCont() function.  
+        #First, toggle visibility of the normalized spectrum plot.
+        self.isVisible = not self.isVisible
+        self.ax2.set_visible(self.isVisible)
+        #Then resize the unnormalized (top) plot to fill the available space.
+        if self.isVisible == True:
+            self.ax1.set_subplotspec(self.subplotspe2P)
+            self.text.set('hide norm')
+        else:
+            self.ax1.set_subplotspec(self.subplotspe1P)
+            self.text.set('show norm')
+        
+        self.canvas.draw()
+        
         return
 
 
@@ -825,36 +977,51 @@ class rangeSelect:
         self.parentUIRange = parentUIRange
         self.bStartSelect = True
         self.lastrect = None
+        #Set the axes object to apply this rectangle to
+        #(axes 0 should be a placeholder for the one panel plot so default to 1)
+        self.currentAxes = 1
         
     def onClick(self, event):
-        #Tkinter uses units from the top left, while matplotlib provides units from the bottom left.
-        #So we need to flip matplotlilb's provided values (even in screen space)
-        x0full, x1full = self.canvas.figure.gca().bbox.intervalx
-        y0full, y1full = self.canvas.figure.gca().bbox.intervaly
-        height = self.canvas.figure.bbox.height
-        y0mod = height - y1full
-        y1mod = height - y0full
-        
+        #Either start drawing the selectin box, or stop drawing the selection box
+        #and return the seleced range.
         if self.bStartSelect:  #For the 1st click
+            #Get the click event position (in screen space)
             self.x0 = x0 = event.x
             self.y0 = y0 = event.y
             
-            #drawn then update a rectangle as the mouse moves
-            self.bStartSelect = False
-            self.lastrect = self.canvasWidget.create_rectangle(x0, y0mod, x0, y1mod)
-            self.oldBindMove = self.canvasWidget.bind('<Motion>')
-            self.funcid = self.canvasWidget.bind('<Motion>', self.onMovePointer)
-        else:
+            #Get the matplotlib axes objects positions (in screen space)
+            a0x0, a0x1, a0y0, a0y1 = getAxesCornersFromBbox(
+                self.canvas.figure.axes[1], self.canvas)
+            a1x0, a1x1, a1y0, a1y1 = getAxesCornersFromBbox(
+                self.canvas.figure.axes[2], self.canvas)
+            
+            #If the click was on one of the plots
+            if (x0 >= a0x0 and x0 <= a0x1 and y0 >= a0y0 and y0 <= a0y1):
+                #set flags for this plot and drawn a rectangle
+                self.currentAxes = 1
+                self.bStartSelect = False
+                self.lastrect = self.canvasWidget.create_rectangle(x0, a0y0, x0, a0y1)
+            elif(x0 >= a1x0 and x0 <= a1x1 and y0 >= a1y0 and y0 <= a1y1):
+                #set flags for this plot and drawn a rectangle
+                self.currentAxes = 2
+                self.bStartSelect = False
+                self.lastrect = self.canvasWidget.create_rectangle(x0, a1y0, x0, a1y1)
+            #If we are starting to select a region,
+            #make the rectangle update as the mouse moves
+            if not self.bStartSelect:
+                self.oldBindMove = self.canvasWidget.bind('<Motion>')
+                self.funcid = self.canvasWidget.bind('<Motion>', self.onMovePointer)
+
+        else:  #for the second click
             self.x1 = event.x
             self.y1 = event.y
 
             #Get the cursor position in plotted data coordinates
             #(Testing this against matplotlib's toolbar it seems accurate to a pixel level.)
-            axesdatax0, axesdatax1, axesdatay0, axesdatay1 = self.canvas.figure.gca().axis()
-            axesxrange = x1full - x0full
-            dataxrange = axesdatax1 - axesdatax0
-            self.datax0 = (self.x0 - x0full)/(axesxrange)*(dataxrange) + axesdatax0
-            self.datax1 = (self.x1 - x0full)/(axesxrange)*(dataxrange) + axesdatax0
+            self.datax0, datay0 = getDataCoordsFromPixels(
+                self.canvas.figure.axes[self.currentAxes], self.canvas, self.x0, self.y0)
+            self.datax1, datay1 = getDataCoordsFromPixels(
+                self.canvas.figure.axes[self.currentAxes], self.canvas, self.x1, self.y1)
             
             #Call the creating object's function for processing this range.
             #This is a bit recursive, so there may be a small possibility
@@ -864,8 +1031,8 @@ class rangeSelect:
             self.deactivate()
 
     def cancel(self, *event):
-            self.deactivate()
-            
+        self.deactivate()
+    
     def deactivate(self):
         #if there is an active selection region (not starting to select) undo it
         if not self.bStartSelect:
@@ -880,15 +1047,13 @@ class rangeSelect:
         #Delete and redraw the rectangle when the mouse moves
         x1 = event.x
         y1 = event.y
-        self.canvasWidget.delete(self.lastrect)
         #Get the full vertical range of the plot for the rectangle
-        y0full, y1full = self.canvas.figure.gca().bbox.intervaly
-        #Change from matplotlib to tk's y-axis direction
-        height = self.canvas.figure.bbox.height
-        y0mod = height - y1full
-        y1mod = height - y0full
-        self.lastrect = self.canvasWidget.create_rectangle(self.x0, y0mod, x1, y1mod, dash=[5,5], width=2)
-        #self.lastrect = self.canvasWidget.create_rectangle(self.x0, y0mod, x1, y1mod, dash=[3,3])
+        x0mod, x1mod, y0mod, y1mod = getAxesCornersFromBbox(
+            self.canvas.figure.axes[self.currentAxes], self.canvas)
+        self.canvasWidget.delete(self.lastrect)
+        self.lastrect = self.canvasWidget.create_rectangle(
+            self.x0, y0mod, x1, y1mod, dash=[5,5], width=2)
+
 
 
 #A fairly simple, fairly general tooltip
