@@ -1,7 +1,6 @@
 #Helper functions for continuum normalization fitting
 
 import numpy as np
-import time
 import scipy.constants
 c = scipy.constants.c*1e-3 #km/s
 
@@ -168,9 +167,7 @@ def readObs(observationName, trimMax=-1.):
         nObsCol = 6
         inSpec = [obsWl, obsI, obsV, obsN1, obsN2, obsSig]
     else:
-        print('ERROR: found an unexpected number of columns ({:}) in observation: {:}'.format(nObsCol,observationName))
-        import sys
-        sys.exit()
+        raise ValueError('Found an unexpected number of columns ({:}) in observation: {:}'.format(nObsCol,observationName))
 
     orders = orderEdges(obsWl)
     

@@ -14,9 +14,12 @@ except ImportError:  #Probably not in matplotlib 3.x
     except ImportError: #not sure what failed, try just not using this extra toolbar
         mplToolbar=0
 
-#For implementing the default Matplotlib key bindings.
+#For implementing the default Matplotlib key bindings use:
 #from matplotlib.backend_bases import key_press_handler
-import guiControls2 as guic
+try:
+    from . import guiControls2 as guic
+except ImportError: #If this is just running scripts not the full package
+    import guiControls2 as guic
 
 def makeWin(fig, ax, ax2, axDummy, par, polyDegs, ords, obsWl, obsI, obsSig, 
             obsIavg, bFittable, plObs, setPlObsO, setPlPoly, plFitting):

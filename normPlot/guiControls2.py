@@ -6,8 +6,10 @@ import tkinter.messagebox as messagebox
 import tkinter as tk
 import tkinter.ttk as ttk
 import tkinter.font as tkfont
-import fittingFuncs2 as ff
-import time
+try:
+    from . import fittingFuncs2 as ff
+except ImportError: #If this is just running scripts not the full package
+    import fittingFuncs2 as ff
 
 
 #Functions for panning and Zooming
@@ -327,7 +329,6 @@ class changeBinSize:
         self.par = par
         self.plFitting = plFitting
     def redoBestInBin(self, event):
-        #tStart = time.clock()
         text = self.txt_velBin.get()
         try:
             float(text)
@@ -350,8 +351,6 @@ class changeBinSize:
 
         if event is not None:
             fittingWl, fittingI, fittingSig, fittingOrder = ff.getBestInBin(self.obsWl, self.obsIavg, self.obsSig, self.obsOrder, self.bFittable, self.par)
-            #tBinned = time.clock()
-            #print('time Binned {:}'.format(tBinned-tStart))
             
             for dline in self.plFitting:
                 dline.set_data(fittingWl, fittingI)

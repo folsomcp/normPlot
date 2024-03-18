@@ -12,12 +12,35 @@ When using the program, typically one would set the running average large enough
 
 The program has an optional feature for dealing with spectral orders that start/end in a broad absorption feature (e.g. a Balmer line).  If the spectrum around the feature is excluded from the fit, and the spectral order ends in this excluded region, the algorithm can try to take a point from the previous/next valid included region (in the previous/next order) and use that to constrain the polynomial.  While this is not particularly accurate, it can help keep the polynomial well behaved.
 
+## Installing
+
+normPlot can be downloaded and installed from PyPI with:
+```
+pip install normPlot
+```
+Or you can download the source files, and some example input files, from Github at [https://github.com/folsomcp/normPlot](https://github.com/folsomcp/normPlot)
+
 
 ## Usage
 
-This program is in Python 3 (>= 3.6 recommended), it uses tkinter for the GUI and matplotlib for visualizing the spectra and fits.  The main executable code is normPlot2.py
+If you have installed the program using pip you can run normPlot with
+```
+normplot [observation_file]
+```
+You can also use `normplot -h` for information about additional command line parameters.  You can also use normPlot inside other scripts like
+```
+import normPlot
+normPlot.normplot('[observation_filename]')
+```
+see `help(normPlot.normplot)` for a full list of function arguments.
 
-You can run the program on an observation with `normPlot2.py [observation_file]`.  Or you can run `normPlot2.py -h` for some other command line parameters.  The program will try to read additional information from exclude.dat, poly-deg.dat, and params.dat, if they exist (if not, defaults will be assumed).  Alternate files can be specified using command line parameters.  When the program is running these parameters can be modified interactively, and the chosen parameters can be saved to those files using "save params" button.  The program can be ran without the interactive window, just reading saved parameter from files, with the -b option.
+If you have downloaded the source files from Github, the main executable code is `normPlot2.py` in the`normPlot/` folder.  The program is in Python 3 and uses tkinter for the GUI and matplotlib for visualizing spectra.  You can run the program on an observation with
+```
+python3 normPlot/normPlot2.py [observation_file]
+```
+and you can run `python3 normPlot/normPlot2.py -h` for some other command line parameters.
+
+When run, program will try to read additional information from exclude.dat, poly-deg.dat, and params.dat, if they exist (if not, defaults will be assumed).  Alternate files can be specified using command line parameters.  When the program is running these parameters can be modified interactively, and the chosen parameters can be saved to those files using "save params" button.  The program can be ran without the interactive window, just reading saved parameter from files, with the -b option. 
 
 The observation file should be in a text format with columns of wavelength, intensity, and optionally errors or polarimetric information and errors.  Spectral orders are identified by looking for overlap or gaps in wavelength.  Spectra with gaps in wavelength for other reasons (e.g. a large number of omitted bad pixels) may cause issues for the order identification.
 
