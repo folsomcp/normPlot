@@ -504,6 +504,7 @@ def fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig, polyDegs
 def mergeOrders(ords, wl, *specList):
     #Simplistic merging of spectral orders, by just truncating them
     #at the midpoint of order overlap.
+    overlapFracMerge = 0.5
     merSpecList = []
     for spec in specList:
         merSpec = np.zeros(0)
@@ -514,7 +515,12 @@ def mergeOrders(ords, wl, *specList):
             if i >= ords.numOrders-1:
                 wlEndMid = ords.wlOrderEnd[-1]
             else:
-                wlEndMid = (ords.wlOrderEnd[i]+ords.wlOrderStart[i+1])*0.5
+                #if ords.wlOrderEnd[i] >= 840.: #wavelength dependence could look like
+                #    overlapFracMerge = 0.2
+                #else: 
+                #    overlapFracMerge = 0.5
+                wlEndMid = (ords.wlOrderEnd[i]*overlapFracMerge
+                            +ords.wlOrderStart[i+1]*(1-overlapFracMerge))
                 
             indRange = (wl[ords.iOrderStart[i]:ords.iOrderEnd[i]+1] >= wlStartMid) \
                 & (wl[ords.iOrderStart[i]:ords.iOrderEnd[i]+1] <= wlEndMid)
