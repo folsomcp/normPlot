@@ -2,7 +2,7 @@
 A tool for normalizing stellar spectra, with an interactive GUI.
 
 
-## Introduction
+## Overview
 
 This program is designed for continuum normalizing reduced 1D stellar spectra, typically from an echelle spectrograph.  
 
@@ -21,7 +21,7 @@ pip install normPlot
 Or you can download the source files, and some example input files, from Github at [https://github.com/folsomcp/normPlot](https://github.com/folsomcp/normPlot)
 
 
-## Usage
+## Using
 
 If you have installed the program using pip you can run normPlot with
 ```
