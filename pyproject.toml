@@ -7,17 +7,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "normPlot"
-version = "2.5.0b1"
+version = "2.5.0"
 authors = [ { name="Colin Folsom", email="fosomcp+dev@gmail.com" },
 ]
 description = "An interactive tool for normalizing stellar spectra"
 readme = "README.md"
 requires-python = ">=3.8"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Astronomy",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
@@ -28,7 +29,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/folsomcp/normPlot/"
-#Documentation = "https://folsomcp.github.io/specpolFlow/"
+Documentation = "https://folsomcp.github.io/specpolFlow/"
 
 [project.scripts]
 normplot = "normPlot.normPlot2:normplot_cli"
