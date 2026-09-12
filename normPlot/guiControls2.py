@@ -515,7 +515,7 @@ class saveParams:
 class runFitCont:
     def __init__(self, canvas, changeRunningAvg, changeBinSize,
                  obsWl, obsI, obsSig, ords, bFittable, obsIavg,
-                 par, polyDegs, setPlPoly, plFitting):
+                 par, polys, setPlPoly, plFitting):
         self.canvas = canvas
         self.ax2 = self.canvas.figure.axes[2]
         self.chRunningAvg = changeRunningAvg
@@ -527,7 +527,7 @@ class runFitCont:
         self.bFittable = bFittable
         self.obsIavg = obsIavg
         self.par = par
-        self.polyDegs = polyDegs
+        self.polys = polys
         self.setPlPoly = setPlPoly
         self.plFitting = plFitting
     def refitCont(self):
@@ -547,7 +547,7 @@ class runFitCont:
             self.obsWl, self.obsIavg, self.obsSig, self.ords.obsOrder,
             self.bFittable, self.par)
         fitIvals = ff.fitPoly(self.obsWl, self.ords, fittingOrder, fittingWl,
-                              fittingI, fittingSig, self.polyDegs)
+                              fittingI, fittingSig, self.polys)
 
         #re-draw the fitting polynomial
         i=0
@@ -641,9 +641,10 @@ class fillEdgeGaps:
 #Open a new matplotlib window with a set of textboxes for setting polynomial degrees
 #This is pretty inefficient, but lets you see all the polynomial orders in one place.
 class newWindowDeg:
-    def __init__(self, parent, polyDegs, ords, setPlObsO, setPlPoly):
+    def __init__(self, parent, polys, ords, setPlObsO, setPlPoly):
         self.parent = parent
-        self.polyDegs = polyDegs
+        self.polys = polys
+        self.tkStrPolyType = tk.StringVar(value=self.polys.type)
         self.ords = ords
         self.setPlObsO = setPlObsO
         self.setPlPoly = setPlPoly
@@ -674,21 +675,41 @@ class newWindowDeg:
         self.active = True
         
         self.win = tk.Toplevel(self.parent)
-        self.win.title("Set fitting polynomial degrees")
+        self.win.title("Set fitting polynomial type and degrees")
         #Associate this window with its parent,
         #and keep this window out of the window manager.
         self.win.transient(self.parent)
         #Set what happens when the window manager asks to close the window.
         self.win.protocol("WM_DELETE_WINDOW", self.closeWindow)
-
         
+        if self.polys.type == 'Spline':
+            textHeader = 'Set number of spline knots for each observation order'
+        elif self.polys.type == 'SmSpline':
+            textHeader = 'Set spline smoothing value for each observation order'
+        else:
+            textHeader = 'Set polynomial degree for each observation order'
         #styleWframe = ttk.Style()
         #styleWframe.configure('wframe.TLabelframe', relief='flat')
-        wframe = ttk.Labelframe(self.win, text='Set polynomial degree for each observation order',
+        wframe = ttk.Labelframe(self.win, text=textHeader,
                                 padding="5 5 5 5")
         wframe.pack(fill=tk.BOTH, expand=1, padx=4, pady=4)
         self.wframe = wframe
 
+        #add a dropdown box for polynomial type, using known polynomial types from ff
+        cboxPolyType = ttk.Combobox(wframe, textvariable=self.tkStrPolyType,
+                                    values=ff.supportedPolyTypes, 
+                                    width=12)
+        cboxPolyType.state(["readonly"])
+        cboxPolyType.bind('<<ComboboxSelected>>', self.updatePolyType)
+        cboxPolyType.grid(row=0, column=0, columnspan=4)
+        ToolTip(cboxPolyType, "Set the type of polynomials used for fitting.\n"
+                "'Geometric' uses a simple power series.\n"
+                "'Spline' uses cubic splines and an input number of knots.\n"
+                "'SmoothSpline' uses a regularized spline fit with an input "
+                "regularization (smoothing) strength, "
+                "see Scipy make_smoothing_spline for details.", wraplength=300)
+
+        # build a grid of spectral order labels and polynomial degree entry boxes
         self.setChangePolyDeg = []
         setTxtDegrees = []
         nrows = 20
@@ -709,10 +730,15 @@ class newWindowDeg:
                 self.ords.wlOrderStart[iorder], self.ords.wlOrderEnd[iorder]),
                     waittime = 250)
             txt_degree = tk.StringVar()
-            txt_degree.set('{:n}'.format(self.polyDegs[iorder]))
+            if self.polys.type == 'Spline': #Set the entry based on polys.type
+                txt_degree.set('{:n}'.format(self.polys.nknots[iorder]))
+            elif self.polys.type == 'SmSpline':
+                txt_degree.set('{:n}'.format(self.polys.splam[iorder]))
+            else:
+                txt_degree.set('{:n}'.format(self.polys.degs[iorder]))
             setTxtDegrees += [txt_degree]
             changePolyDeg = changePolyDegree(self, wframe, setTxtDegrees[iorder],
-                                             self.polyDegs, iorder)
+                                             self.polys, iorder)
             self.setChangePolyDeg += [changePolyDeg]
             inputDegree = ttk.Entry(master=wframe, textvariable=setTxtDegrees[iorder], width=6)
             inputDegree.bind('<Key-Return>', changePolyDeg.updateDegree)
@@ -721,7 +747,7 @@ class newWindowDeg:
             
             #Set up buttons in columns nrows long, then however many columns necessary
             ypos = (iorder//nrows)
-            xpos = (iorder%nrows)
+            xpos = (iorder%nrows) + 1
             lblOrderNum.grid(row=xpos, column=ypos*2, sticky=tk.E, pady=2)
             inputDegree.grid(row=xpos, column=ypos*2+1, sticky=tk.W, pady=2)
 
@@ -748,6 +774,30 @@ class newWindowDeg:
         for i in range(self.ords.numOrders):
             err = self.setChangePolyDeg[i].updateDegree(batch=True)
             errs += err
+        return
+
+    def updatePolyType(self, *event):
+        newPolyType = self.tkStrPolyType.get()
+        if newPolyType in ff.supportedPolyTypes:
+            # Save new poly type
+            self.polys.type = newPolyType
+            if self.polys.type == 'Spline':
+                textHeader = 'Set number of spline knots for each observation order'
+                currentParams = self.polys.nknots
+            elif self.polys.type == 'SmSpline':
+                textHeader = 'Set spline smoothing value for each observation order'
+                currentParams = self.polys.splam
+            else:
+                textHeader = 'Set polynomial degree for each observation order'
+                currentParams = self.polys.degs
+            self.wframe.configure(text=textHeader)
+            # Display poly degree values for the different type
+            for i, changePolyDeg in enumerate(self.setChangePolyDeg):
+                changePolyDeg.txt_degree.set('{:n}'.format(currentParams[i]))
+        else:
+            raise ValueError('Unsupported polynomial type selected: {:} '
+                             'Should be one of {:}'.format(
+                                 newPolyType, ff.supportedPolyTypes))
         return
     
     def printError(self, message, batch=False):
@@ -785,40 +835,100 @@ class newWindowDeg:
      
            
 class changePolyDegree:
-    def __init__(self, newWindowDeg, wframe, txt_degree, polyDegs, iorder):
+    def __init__(self, newWindowDeg, wframe, txt_degree, polys, iorder):
         self.newWindowDeg = newWindowDeg
         self.wframe = wframe
         self.txt_degree = txt_degree
-        self.polyDegs = polyDegs
+        self.polys = polys
         self.iorder = iorder #this is just an interger, so not mutable
         
     def updateDegree(self, *event, batch=False):
         text = self.txt_degree.get()
-        try:
-            int(text)
-        except ValueError:
-            print('got a non-integer value for a polynomial degree: {:}'.format(text))
-            self.newWindowDeg.printError(
-                'Need an integer value for polynomial {:n} degree: {:}'.format(
-                    self.iorder+1, text), batch)
-            return 1
-        polyDeg = int(text)
-        if not(polyDeg >= 0 and polyDeg < 1000):
-            print('extreme value for a polynomial degree: {:}'.format(polyDeg))
+        # check for valid polynomial degree values (that are not too high)
+        if (self.polys.type == 'Geometric' or self.polys.type == 'Chebyshev'
+            or self.polys.type == 'Legendre'):
+            try:
+                polyDeg = int(text)
+            except ValueError:
+                print('got a non-integer value for a polynomial degree: {:}'.format(text))
+                self.newWindowDeg.printError(
+                    'Need an integer value for polynomial {:n} degree: {:}'.format(
+                        self.iorder+1, text), batch)
+                return 1
+            if not(polyDeg >= 0 and polyDeg < 1000):
+                print('extreme value for a polynomial degree: {:}'.format(polyDeg))
+                if polyDeg < 0:
+                    self.newWindowDeg.printError(
+                        'Need a positive value for polynomial {:n} degree: {:}'.format(
+                            self.iorder+1, polyDeg), batch)
+                else:
+                    self.newWindowDeg.printError(
+                        'Need a less extreme value for polynomial {:n} degree: {:}'.format(
+                            self.iorder+1, polyDeg), batch)
+                return 1
+        # check for valid number of knots for a spline
+        elif self.polys.type == 'Spline':
+            try:
+                polyDeg = int(text)
+            except ValueError:
+                print('got a non-integer value for number of spline knots: {:}'.format(text))
+                self.newWindowDeg.printError(
+                    'Need an integer value for number of knots in order {:n} (got {:})'.format(
+                        self.iorder+1, text), batch)
+                return 1
             if polyDeg < 0:
+                print('Need a positive value for number of knots in order {:n} (got{:})'.format(
+                    self.iorder+1, text))
                 self.newWindowDeg.printError(
-                    'Need a positive value for polynomial {:n} degree: {:}'.format(
-                        self.iorder+1, polyDeg), batch)
-            else:
+                    'Need a positive value for number of knots in order {:n}'.format(
+                        self.iorder+1), batch)
+                return 1
+            elif polyDeg > 1000000:
+                print('Need a less extreme value for number of knots in order {:n} (got {:})'.format(
+                    self.iorder+1, text))
                 self.newWindowDeg.printError(
-                    'Need a less extreme value for polynomial {:n} degree: {:}'.format(
+                    'Need a less extreme value for number of knots in order {:n} (got {:})'.format(
                         self.iorder+1, polyDeg), batch)
-            return 1
+                return 1
+        # check for valid smoothing/regularizing lambda
+        elif self.polys.type == 'SmSpline':
+            try:
+                polyDeg = float(text)
+            except ValueError:
+                print('got a non-number value for spline smoothing value: {:}'.format(text))
+                self.newWindowDeg.printError(
+                    'Need a number for spine smoothing value in order {:n} (got {:})'.format(
+                        self.iorder+1, text), batch)
+                return 1
+            if polyDeg < 0.0:
+                print('Need a positive value for spline smoothing in order {:n} (got{:})'.format(
+                    self.iorder+1, text))
+                self.newWindowDeg.printError(
+                    'Need a positive value for spline smoothing in order {:n}'.format(
+                        self.iorder+1), batch)
+                return 1
+        # other test cases
+        else:
+            try:
+                polyDeg = float(text)
+            except ValueError:
+                self.newWindowDeg.printError(
+                    'Need an number value for order {:n} (got {:})'.format(
+                        self.iorder+1, text), batch)
+                return 1
+
+        # if successfully (we haven't hit an error case) clear error messages
         if not batch:
             self.newWindowDeg.printClear()
-        self.polyDegs[self.iorder] = polyDeg
+        # and save the value (based on type)
+        if self.polys.type == 'Spline':
+            self.polys.nknots[self.iorder] = polyDeg
+        elif self.polys.type == 'SmSpline':
+            self.polys.splam[self.iorder] = polyDeg
+        else:
+            self.polys.degs[self.iorder] = polyDeg
         return 0
-    
+
     
 #Open a new window for inputing parameters controling the writing of the spectrum
 #e.g. scale the wavelength to change units or convert wavelength from vacuum to air

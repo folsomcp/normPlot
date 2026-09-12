@@ -115,31 +115,15 @@ def normplot(observationName, excludeRegionName=_excludeRegionName,
                     i += 1
         fExclude.close()
     
-    #Read in the polynomial degrees from a file, if it exists
-    try:
-        fPolyDeg = open(polynomialsName, 'r')
-    except IOError:
-        print('did not find {:}, using defaults'.format(polynomialsName))
-        polyDegs = []
-    else:
-        print('reading polynomial degrees from {:}'.format(polynomialsName))
-        polyDegs = []
-        i=0
-        for line in fPolyDeg:
-            if len(line.split()) > 0:
-                if line.split()[0][0] != '#':        
-                    polyDegs += [int(line.split()[0])]
-                    i += 1
-        fPolyDeg.close()
+    # Set up the polynomial degrees object (with defaults values)
+    # Then read in the polynomial degrees from a file, if it exists
+    polys = ff.polySet(ords.numOrders)
+    polys.readPolyParams(polynomialsName)
     
-    #Initialize a few control parameters for the routine
+    # Initialize a few control parameters for the routine
     par = ff.controlPars(averageLen=11, velBin=500., bMergeOrd=False, bFillEdgeGaps=True)
-    #Read in values for those parameters, if the file exists
+    # Read in values for those parameters, if the file exists
     par.readParams(paramsName)
-    
-    
-    #Match up the (optionally) read polynomial degrees with the found spectral orders
-    polyDegs = ff.fixExtraPolyDegs(polyDegs, ords, defaultDegree=5)
     
     #Moving average (running average) for the intensity spectrum
     obsIavg = ff.runningAvg(obsI, ords, par.averageLen)
@@ -148,10 +132,12 @@ def normplot(observationName, excludeRegionName=_excludeRegionName,
     bFittable = ff.getIndFittable2(obsWl, obsSig, excludeWls)
     
     #Bin in velocity (km/s) units to search for the best continuum point
-    fittingWl, fittingI, fittingSig, fittingOrder = ff.getBestInBin(obsWl, obsIavg, obsSig, ords.obsOrder, bFittable, par)
+    fittingWl, fittingI, fittingSig, fittingOrder = ff.getBestInBin(
+        obsWl, obsIavg, obsSig, ords.obsOrder, bFittable, par)
     
     #Fit a polynomial to the selected best continuum points, geting  
-    fitIvals = ff.fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig, polyDegs)
+    fitIvals = ff.fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig,
+                          polys)
     
     
     #Plotting
@@ -195,7 +181,8 @@ def normplot(observationName, excludeRegionName=_excludeRegionName,
     
         #Make the main GUI window, with Tkinter, embedding the matplotlib figure.
         #This runs a main loop untill the window is closed.
-        mainWin.makeWin(fig, ax, ax2, axDummy, par, polyDegs, ords, obsWl, obsI, obsSig, obsIavg,
+        mainWin.makeWin(fig, ax, ax2, axDummy, par, polys,
+                        ords, obsWl, obsI, obsSig, obsIavg,
                         bFittable, plObs, setPlObsO, setPlPoly, plFitting)
         
         #Update the final continuum polynomial from the y data

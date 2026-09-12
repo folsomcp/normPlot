@@ -21,7 +21,7 @@ try:
 except ImportError: #If this is just running scripts not the full package
     import guiControls2 as guic
 
-def makeWin(fig, ax, ax2, axDummy, par, polyDegs, ords, obsWl, obsI, obsSig, 
+def makeWin(fig, ax, ax2, axDummy, par, polys, ords, obsWl, obsI, obsSig, 
             obsIavg, bFittable, plObs, setPlObsO, setPlPoly, plFitting):
     #Build GUI with tkinter
     root = tk.Tk(className='norm')
@@ -143,10 +143,10 @@ def makeWin(fig, ax, ax2, axDummy, par, polyDegs, ords, obsWl, obsI, obsSig,
     butSetParams.grid(row=0, column=0)
     
     #Open a new window for seting order polynomial degrees
-    winSetPoly = guic.newWindowDeg(root, polyDegs, ords, setPlObsO, setPlPoly)
+    winSetPoly = guic.newWindowDeg(root, polys, ords, setPlObsO, setPlPoly)
     butSetPoly = ttk.Button(master=tools, text="set poly.\ndegree...",
                             command=winSetPoly.openWindow)
-    guic.ToolTip(butSetPoly, "Set the degrees of the fitting polynomials.")
+    guic.ToolTip(butSetPoly, "Set the degrees of the fitting polynomials, and type of polynomial used.")
     butSetPoly.grid(row=0, column=1)
 
     #Toggle looking ahead to fill in gaps, when there is an exclude region
@@ -212,18 +212,19 @@ def makeWin(fig, ax, ax2, axDummy, par, polyDegs, ords, obsWl, obsI, obsSig,
     
     #Save the used fitting parameters for late use
     #setup function used to pass information for writing
-    par.linkPolyDegExclude(polyDegs, bFittable, obsWl, ords)
+    par.linkPolyDegExclude(polys, bFittable, obsWl, ords)
     #helper function that calls par.saveValues, gets info from the Entry boxes
     saveParams = guic.saveParams(par, changeRunningAvg, changeBinSize) 
     butSavePar = ttk.Button(master=tools, text='save\nparams',
                             command=saveParams.doSave)
-    guic.ToolTip(butSavePar, 'Save the parameters currently used, including polynomial degrees and included wavelength ranges.', wraplength = 300)
+    guic.ToolTip(butSavePar, 'Save the parameters currently used, including polynomial '
+                 'degrees and included wavelength ranges.', wraplength = 300)
     butSavePar.grid(row=4, column=9)
     
     #Run the continuum fitting 
     bFitCont = guic.runFitCont(canvas, changeRunningAvg, changeBinSize,
                                obsWl, obsI, obsSig, ords, bFittable, obsIavg,
-                               par, polyDegs, setPlPoly, plFitting)
+                               par, polys, setPlPoly, plFitting)
     butFitCont = ttk.Button(master=tools, text='fit cont.',
                             command=bFitCont.refitCont)
     guic.ToolTip(butFitCont, 'Fit the continuum and plot the results')
