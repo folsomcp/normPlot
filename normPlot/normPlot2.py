@@ -115,16 +115,16 @@ def normplot(observationName, excludeRegionName=_excludeRegionName,
                     i += 1
         fExclude.close()
     
-    # Set up the polynomial degrees object (with defaults values)
-    # Then read in the polynomial degrees from a file, if it exists
-    polys = ff.polySet(ords.numOrders)
-    polys.readPolyParams(polynomialsName)
-    
     # Initialize a few control parameters for the routine
     par = ff.controlPars(averageLen=11, velBin=500., bMergeOrd=False, bFillEdgeGaps=True)
     # Read in values for those parameters, if the file exists
     par.readParams(paramsName)
     
+    # Set up the polynomial degrees object (with defaults values)
+    # Then read in the polynomial degrees from a file, if it exists
+    polys = ff.polySet(ords, obsWl, obsI, par.velBin)
+    polys.readPolyParams(polynomialsName)
+
     #Moving average (running average) for the intensity spectrum
     obsIavg = ff.runningAvg(obsI, ords, par.averageLen)
     

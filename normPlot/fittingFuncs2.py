@@ -8,11 +8,48 @@ supportedPolyTypes = ('Chebyshev', 'Legendre', 'Geometric', 'Spline', 'SmSpline'
 
 #Save polynomial degrees and type into one object
 class polySet():
-    def __init__(self, numOrders, polyType=supportedPolyTypes[0]):
+    def __init__(self, ords, obsWl, obsI, velBin=500.,
+                 polyType=supportedPolyTypes[0]):
         self.type = polyType
-        self.degs = [5]*numOrders
-        self.nknots = [4]*numOrders
-        self.splam = [1.0]*numOrders
+        self.degs = [5]*ords.numOrders
+        self.nknots = [4]*ords.numOrders
+        self.splam = [1.0]*ords.numOrders
+
+        # For the smoothed spline fit:
+        # Use a heuristic to roughly estimate the regularization parameter lambda
+        # Typically the chi^2 and regularization terms should be of the same
+        # order of magnitude in regularized fitting.  Here we use chi^2 with no
+        # error bars (no weights), since we are unlikely to get statistically 'good'
+        # fits, and that makes lambda a bit easier to estimate.
+        # The regularization term is the second derivative of the spline squared,
+        # integrated over the wavelength range used.
+        # As a rough order-of-magnitude heuristic for this:
+        # chi^2 ~~ npts * (how_close * specI)^2
+        # regularization ~~ (how_flat * specI / wl^2)^2 * widthWl
+        #                ~~ how_flat^2 * specI^2 * widthWl / wl^4
+        # With tuned parameters now_close and how_flat
+        # The lambda = chi^2/regularization
+        # lambda ~~ (how_close/how_flat)^2 * (npts * wl^4 / widthWl)
+        # This needs to be evaluated for each order
+        for i in range(ords.numOrders):
+            #Get points in this spectral order
+            iOrd = (ords.obsOrder == i)
+            obsWlOrd = obsWl[iOrd]
+            deltaWl = obsWlOrd[-1] - obsWlOrd[0]
+            midWl = 0.5*(obsWlOrd[-1] + obsWlOrd[0])
+            # Get the number of fitting points likely to be used
+            # (as the window size in velocity / velocity search bin size)
+            velSize = c*deltaWl/midWl
+            numFitPts = np.rint(velSize/velBin)
+
+            lamb = ((1e-5)**2)*numFitPts*(midWl**4)/deltaWl
+            # Now round lambda to just 1 significant figure,
+            # to make it cleaner to display and easier to change
+            # First get the number of digits in the decimal number lambda
+            nDigits = np.floor(np.log10(lamb)).astype('int')
+            lambRound = np.around(lamb, -nDigits) #then round to that many digits
+            self.splam[i] = lambRound
+
 
     def readPolyParams(self, polynomialsName):
         """
@@ -621,29 +658,10 @@ def fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig, polys):
         elif polys.type == 'SmSpline':
             splDegree = 3 # spline degree (cubic spline = 3)
             lam = polyDegO
+            spl = make_smoothing_spline(fittingWlShift, fittingI[iOrd], lam=lam)
+            # To include error bars (but that makes setting lambda harder) use:
             #spl = make_smoothing_spline(fittingWlShift, fittingI[iOrd],
             #                            lam=lam, w=1./fittingSig[iOrd]**2)
-            spl = make_smoothing_spline(fittingWlShift, fittingI[iOrd])
-            
-            # chi2 = np.sum(((fittingI[iOrd] - spl(fittingWlShift))/fittingSig[iOrd])**2)
-            # print('lamba', lam, 'chi2:', chi2,
-            #       'no err chi2', np.sum((fittingI[iOrd] - spl(fittingWlShift))**2),
-            #       'reduced chi2', chi2/(fittingWlShift.size), 'npts',  fittingWlShift.size)
-            # print('flat no err chi2', np.sum((fittingI[iOrd] - np.average(fittingI[iOrd]))**2) )
-            # print('flat some err chi2', np.sum(((fittingI[iOrd] - np.average(fittingI[iOrd]))/fittingSig[iOrd])**2) )
-            # print('flat median chi2', np.sum(((fittingI[iOrd] - np.median(fittingI[iOrd]))/fittingSig[iOrd])**2) )
-            # splD2 = spl.derivative(2)
-            # #print(splD2(fittingWlShift)**2)
-            # #print(fittingWlShift[1:] - fittingWlShift[:-1])
-            # print('int splD2^2', np.trapz(y=splD2(fittingWlShift)**2, x=fittingWlShift) )
-            # print(np.quantile(fittingI[iOrd], (0.5, 0.9, 0.99)) )
-            # print(np.quantile(fittingI[iOrd], (0.5, 0.9, 0.99))*(fittingWlShift[-1] - fittingWlShift[0]) )
-            # #print(spl.integrate(fittingWlShift[0], fittingWlShift[-1]),
-            # #      splD2.integrate(fittingWlShift[0], fittingWlShift[-1]))
-            
-            #print(spl.k)
-            #print(spl.t, spl.t.size, fittingWlShift.size)
-            #print(spl.c)
             polyfitvals += [spl]
             fitIvals += [spl(obsWlShift)]
             
