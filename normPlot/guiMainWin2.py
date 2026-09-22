@@ -160,7 +160,8 @@ def makeWin(fig, ax, ax2, axDummy, par, polys, ords, obsWl, obsI, obsSig,
     chkbutFillEdgeGaps.grid(row=0, column=3, padx=2)
     
     #Set the moving/running average length
-    lblRunningAvg = ttk.Label(tools, text='average\nlength', justify='right', padding=(2,0,0,0))
+    lblRunningAvg = ttk.Label(tools, text='average\nlength', justify='right',
+                              padding=(2,0,0,0))
     lblRunningAvg.grid(row=0, column=4, sticky=tk.E)
     txt_runningAvg = tk.StringVar()
     txt_runningAvg.set('{:n}'.format(par.averageLen))
@@ -176,12 +177,14 @@ def makeWin(fig, ax, ax2, axDummy, par, polys, ords, obsWl, obsI, obsSig,
     entryRunAvg.bindtags((tmpBindTags[0], tmpBindTags[1], tmpBindTags[3]))
 
     #Set the bin in velocity for selecting best continuum points
-    lblVelBin = ttk.Label(tools, text='srch. bin\n(km/s)', justify='right', padding=(2,0,0,0))
+    lblVelBin = ttk.Label(tools, text='srch. bin\n(km/s)', justify='right',
+                          padding=(2,0,0,0))
     lblVelBin.grid(row=0, column=6, sticky=tk.E)
     txt_velBin = tk.StringVar()
     txt_velBin.set('{:.0f}'.format(par.velBin))
     changeBinSize = guic.changeBinSize(canvas, txt_velBin, obsWl, obsIavg, 
-                            obsSig, ords.obsOrder, par, bFittable, plFitting)
+                                       obsSig, ords.obsOrder, par, polys,
+                                       bFittable, plFitting)
     entryBinSize = ttk.Entry(master=tools, textvariable=txt_velBin, width=6)
     entryBinSize.bind('<Key-Return>', changeBinSize.redoBestInBin)
     guic.ToolTip(entryBinSize, 'Set the size of the bin searched for the best continuum point, in km/s.', wraplength = 300)

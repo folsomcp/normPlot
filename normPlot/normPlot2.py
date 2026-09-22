@@ -133,11 +133,11 @@ def normplot(observationName, excludeRegionName=_excludeRegionName,
     
     #Bin in velocity (km/s) units to search for the best continuum point
     fittingWl, fittingI, fittingSig, fittingOrder = ff.getBestInBin(
-        obsWl, obsIavg, obsSig, ords.obsOrder, bFittable, par)
-    
+        obsWl, obsIavg, obsSig, ords.obsOrder, bFittable, par, polys.type)
+
     #Fit a polynomial to the selected best continuum points, geting  
-    fitIvals = ff.fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig,
-                          polys)
+    fitIvals = ff.fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI,
+                          fittingSig, polys)
     
     
     #Plotting

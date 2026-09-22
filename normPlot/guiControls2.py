@@ -318,7 +318,7 @@ class changeRunningAvg:
 #Read and rerun the selecton of best continuum points in the velocity sized spectral bins
 class changeBinSize:
     def __init__(self, canvas, txt_velBin, obsWl, obsIavg, obsSig, 
-                 obsOrder, par, bFittable, plFitting):
+                 obsOrder, par, polys, bFittable, plFitting):
         self.canvas = canvas
         self.txt_velBin = txt_velBin
         self.obsWl = obsWl
@@ -327,6 +327,7 @@ class changeBinSize:
         self.obsSig = obsSig
         self.obsOrder = obsOrder
         self.par = par
+        self.polys = polys
         self.plFitting = plFitting
     def redoBestInBin(self, event):
         text = self.txt_velBin.get()
@@ -350,8 +351,9 @@ class changeBinSize:
         self.par.velBin = velBin
 
         if event is not None:
-            fittingWl, fittingI, fittingSig, fittingOrder = ff.getBestInBin(self.obsWl, self.obsIavg, self.obsSig, self.obsOrder, self.bFittable, self.par)
-            
+            fittingWl, fittingI, fittingSig, fittingOrder = ff.getBestInBin(
+                self.obsWl, self.obsIavg, self.obsSig, self.obsOrder,
+                self.bFittable, self.par, self.polys.type)
             for dline in self.plFitting:
                 dline.set_data(fittingWl, fittingI)
             self.canvas.draw()
@@ -545,7 +547,7 @@ class runFitCont:
         #since exclude regions or the average may have changed.
         fittingWl, fittingI, fittingSig, fittingOrder = ff.getBestInBin(
             self.obsWl, self.obsIavg, self.obsSig, self.ords.obsOrder,
-            self.bFittable, self.par)
+            self.bFittable, self.par, self.polys.type)
         fitIvals = ff.fitPoly(self.obsWl, self.ords, fittingOrder, fittingWl,
                               fittingI, fittingSig, self.polys)
 
