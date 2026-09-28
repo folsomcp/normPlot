@@ -4,7 +4,7 @@ import numpy as np
 import scipy.constants
 c = scipy.constants.c*1e-3 #km/s
 
-supportedPolyTypes = ('Chebyshev', 'Legendre', 'Geometric', 'Spline', 'SmSpline', 'SplRep')
+supportedPolyTypes = ('Chebyshev', 'Legendre', 'Geometric', 'Spline', 'SmoothSpline')
 
 #Save polynomial degrees and type into one object
 class polySet():
@@ -80,7 +80,7 @@ class polySet():
                                     raise ValueError('Unsupported polynomial type read from '
                                                      'input file! {:}'.format(tstPolyType))
                                 continue
-                        if self.type == 'SmSpline':
+                        if self.type == 'SmoothSpline':
                             polyDegs += [float(line.split()[0])]                                
                         else:
                             polyDegs += [int(line.split()[0])]                                
@@ -99,7 +99,7 @@ class polySet():
                     print('Read too few numbers of knots ({:}) for the number of '
                           'spectral orders ({:}), padding with default {:}'.format(
                               len(polyDegs), len(self.degs), self.nknots[-1]))
-                elif self.type == 'SmSpline':
+                elif self.type == 'SmoothSpline':
                     print('Read too few spline smoothing values ({:}) for the number of '
                           'spectral orders ({:}), padding with default {:}'.format(
                               len(polyDegs), len(self.degs), self.splam[-1]))
@@ -110,7 +110,7 @@ class polySet():
             # Store the read values into the appropriate place based on type
             if self.type == 'Spline':
                 self.nknots[0:len(polyDegs)] = polyDegs
-            elif self.type == 'SmSpline':
+            elif self.type == 'SmoothSpline':
                 self.splam[0:len(polyDegs)] = polyDegs
             else:
                 self.degs[0:len(polyDegs)] = polyDegs
@@ -482,7 +482,7 @@ def getBestInBin(obsWl, obsIavg, obsSig, obsOrder, bFittable, par, polyType):
     fittingOrder = np.zeros(obsWl.size + 6, dtype=int)
     if polyType == 'Spline':
         nFillPts = 2
-    elif polyType == 'SmSpline':
+    elif polyType == 'SmoothSpline':
         nFillPts = 3
     else:
         nFillPts = 1
@@ -533,6 +533,9 @@ def getBestInBin(obsWl, obsIavg, obsSig, obsOrder, bFittable, par, polyType):
                         fittingSig[nFitPts:nFitPts + nFillPtsUsed] = tmpSig
                         fittingOrder[nFitPts:nFitPts + nFillPtsUsed] = obsOrder[indMax]
                         nFitPts += nFillPtsUsed
+            # Add protection against orders with too few points par.lookToNextOrderForGaps?
+            # (should only happen for Splines and SmoothSpline, when including 1-2 pixel at an order edge
+
             # And lastly, set up the next velocity bin
             binWlStart = obsWl[i]
             binWlEnd = binWlStart + par.velBin/c*binWlStart
@@ -565,10 +568,8 @@ def fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig, polys):
         from numpy.polynomial import legendre as Leg
     elif polys.type == 'Spline':
         from scipy.interpolate import make_lsq_spline
-    elif polys.type == 'SmSpline':
-        from scipy.interpolate import make_smoothing_spline, splrep, splev
-    elif polys.type == 'SplRep':
-        from scipy.interpolate import make_smoothing_spline, splrep, splev
+    elif polys.type == 'SmoothSpline':
+        from scipy.interpolate import make_smoothing_spline
     else:
         raise ValueError('Trying to fit with an unknown polynomial type! {:}'.format(
             polys.type))
@@ -579,7 +580,7 @@ def fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig, polys):
         iOrd = np.where(fittingOrder == i)
         numObsPts = fittingWl[iOrd].shape[0]
         #Check that this order has points to fit
-        if polys.type == 'SmSpline' and numObsPts < 5:
+        if polys.type == 'SmoothSpline' and numObsPts < 5:
             fitIvals += [np.ones(ords.iOrderEnd[i] - ords.iOrderStart[i] + 1)]
             print('ERROR: not enough points to fit spectral order '
                   '{:} ({:} points) need 5!'.format(i+1, numObsPts))
@@ -613,7 +614,7 @@ def fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig, polys):
                       'spline with {:} interior knots, reducing to {:}'.format(
                           i+1, numObsPts, polyDegO, newPolyDegO))
                 polyDegO = newPolyDegO
-        elif polys.type == 'SmSpline':
+        elif polys.type == 'SmoothSpline':
             polyDegO = polys.splam[i]
         else:
             polyDegO = polys.degs[i]
@@ -663,7 +664,7 @@ def fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig, polys):
                                   knots, k=splDegree, w=1./fittingSig[iOrd])
             polyfitvals += [spl]
             fitIvals += [spl(obsWlShift)]
-        elif polys.type == 'SmSpline':
+        elif polys.type == 'SmoothSpline':
             splDegree = 3 # spline degree (cubic spline = 3)
             lam = polyDegO
             spl = make_smoothing_spline(fittingWlShift, fittingI[iOrd], lam=lam)
@@ -673,29 +674,6 @@ def fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI, fittingSig, polys):
             polyfitvals += [spl]
             fitIvals += [spl(obsWlShift)]
             
-        elif polys.type == 'SplRep':
-            splDegree = 3 # spline degree (cubic spline = 3)
-            #knots = np.linspace(fittingWlShift[0], fittingWlShift[-1], 5, endpoint=False)
-            tck = splrep(fittingWlShift, fittingI[iOrd],
-                         w=1./fittingSig[iOrd], k=splDegree,
-                         s=(fittingWlShift.size)*polyDegO)  #, t=knots[1:])
-            # Adding manual knots seems to override smoothing
-            # (Or maybe there just aren't enough degrees of freedom for smoothing algorithm in that case?
-            # But smoothed version seems to have a variable number of knots,
-            # so knot choice seems to be part of that algorithm).
-            #print(tck[0])
-            print(fittingWlShift.size, tck[0].size, tck[1].size)
-            #print(fittingWlShift.size - np.sqrt(2*fittingWlShift.size),
-            #      fittingWlShift.size + np.sqrt(2*fittingWlShift.size),
-            #      fittingWlShift.size - splDegree,
-            #      fittingWlShift.size - tck[1].size)
-            chi2 = np.sum(((fittingI[iOrd] - splev(fittingWlShift, tck))/fittingSig[iOrd])**2)
-            print('chi2:', chi2,
-                  'target:', fittingWlShift.size*polyDegO,
-                  'reduced chi2', chi2/(fittingWlShift.size - (tck[1].size - polyDegO - 1)) )
-            #print(tck)
-            polyfitvals += [tck]
-            fitIvals += [splev(obsWlShift, tck)]
     return fitIvals
 
 

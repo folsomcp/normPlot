@@ -686,7 +686,7 @@ class newWindowDeg:
         
         if self.polys.type == 'Spline':
             textHeader = 'Set number of spline knots for each observation order'
-        elif self.polys.type == 'SmSpline':
+        elif self.polys.type == 'SmoothSpline':
             textHeader = 'Set spline smoothing value for each observation order'
         else:
             textHeader = 'Set polynomial degree for each observation order'
@@ -734,7 +734,7 @@ class newWindowDeg:
             txt_degree = tk.StringVar()
             if self.polys.type == 'Spline': #Set the entry based on polys.type
                 txt_degree.set('{:n}'.format(self.polys.nknots[iorder]))
-            elif self.polys.type == 'SmSpline':
+            elif self.polys.type == 'SmoothSpline':
                 txt_degree.set('{:n}'.format(self.polys.splam[iorder]))
             else:
                 txt_degree.set('{:n}'.format(self.polys.degs[iorder]))
@@ -786,7 +786,7 @@ class newWindowDeg:
             if self.polys.type == 'Spline':
                 textHeader = 'Set number of spline knots for each observation order'
                 currentParams = self.polys.nknots
-            elif self.polys.type == 'SmSpline':
+            elif self.polys.type == 'SmoothSpline':
                 textHeader = 'Set spline smoothing value for each observation order'
                 currentParams = self.polys.splam
             else:
@@ -893,7 +893,7 @@ class changePolyDegree:
                         self.iorder+1, polyDeg), batch)
                 return 1
         # check for valid smoothing/regularizing lambda
-        elif self.polys.type == 'SmSpline':
+        elif self.polys.type == 'SmoothSpline':
             try:
                 polyDeg = float(text)
             except ValueError:
@@ -925,7 +925,7 @@ class changePolyDegree:
         # and save the value (based on type)
         if self.polys.type == 'Spline':
             self.polys.nknots[self.iorder] = polyDeg
-        elif self.polys.type == 'SmSpline':
+        elif self.polys.type == 'SmoothSpline':
             self.polys.splam[self.iorder] = polyDeg
         else:
             self.polys.degs[self.iorder] = polyDeg
