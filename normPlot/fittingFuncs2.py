@@ -4,7 +4,7 @@ import numpy as np
 import scipy.constants
 c = scipy.constants.c*1e-3 #km/s
 
-supportedPolyTypes = ('Chebyshev', 'Legendre', 'Geometric', 'Spline', 'SmoothSpline')
+supportedPolyTypes = ('Geometric', 'Chebyshev', 'Legendre', 'Spline', 'SmoothSpline')
 
 #Save polynomial degrees and type into one object
 class polySet():
