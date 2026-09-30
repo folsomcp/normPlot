@@ -209,10 +209,13 @@ class controlPars():
         fpoly = open(fnamePoly, 'w')
         fpoly.write('#Polynomial degree, for each spectral order\n')
         fpoly.write('{:}\n'.format(self.polys.type))
-        i = 1
-        for polyDeg in self.polys.degs:
-            fpoly.write('{:n}  {:n}\n'.format(polyDeg, i))
-            i += 1
+        for i in range(len(self.polys.degs)):
+            if self.polys.type == 'Spline':
+                fpoly.write('{:n}  {:n}\n'.format(self.polys.nknots[i], i+1))
+            elif self.polys.type == 'SmoothSpline':
+                fpoly.write('{:n}  {:n}\n'.format(self.polys.splam[i], i+1))
+            else:
+                fpoly.write('{:n}  {:n}\n'.format(self.polys.degs[i], i+1))
         fpoly.close()
 
         #Infer exclude regions (wavelength ranges) from the array of fittable points bFittable
@@ -225,7 +228,6 @@ class controlPars():
         edges =  np.nonzero(merFit[1:-1] != merFit[0:-2])[0] + 1
         # If there are no exclude regions found
         if len(edges) < 1:
-            #print('no exclude regions to save')
             fexclude = open(fnameExclude, 'w')
             fexclude.close()
             return
@@ -269,19 +271,9 @@ def readObs(observationName, trimMax=-1.):
         print('reading {:}, 3 column spectrum, assuming input uncertainties'.format(observationName))
         obsWl, obsI, obsSig = np.loadtxt(observationName, usecols = (0,1,2), skiprows=2, unpack=True)
         inSpec = [obsWl, obsI, obsSig]
-        #if np.mean(obsSig) > 0.1*np.mean(obsI):
-        #    print('experimental: treating 3rd colmun as SPIRou telluric spectrum')
-        #    obsWl, obsI, obsTel = np.loadtxt(observationName, usecols = (0,1,2), skiprows=2, unpack=True)
-        #    obsSig = np.std(obsI)*np.ones(obsI.shape)
-        #    inSpec = [obsWl, obsI, obsSig, obsTel]
-        #    nObsCol = 30
     elif nObsCol == 6:
         print('reading {:}, 6 column spectrum, assuming ESPaDOnS format'.format(observationName))
         obsWl, obsI, obsV, obsN1, obsN2, obsSig = np.loadtxt(observationName, usecols = (0,1,2,3,4,5), skiprows=2, unpack=True)
-        inSpec = [obsWl, obsI, obsV, obsN1, obsN2, obsSig]
-    elif nObsCol == 10:
-        print('experimental: reading {:}, 10 column spectrum, assuming Donati SPIRou format'.format(observationName))
-        obsWl, obsI, obsV, obsN1, obsN2, obsSig = np.loadtxt(observationName, usecols = (0,2,3,4,5,7), skiprows=2, unpack=True)
         inSpec = [obsWl, obsI, obsV, obsN1, obsN2, obsSig]
     elif nObsCol == 7:
         print('experimental: reading {:}, 7 column spectrum, from SPIRou DRS "p" (skipping second error column)'.format(observationName))
@@ -427,65 +419,65 @@ def runningAvg(obsI, ords, averageLen):
 #Look ahead to the next order, or back to the previous order, to find a good point for fitting.
 #A good point is the maximum point in a bin, and not in an exclude region.
 #The direction of the search is controlled by iDer (+1 = forward -1 = backward).
-def lookToNextOrderForGaps(obsWl, obsIavg, obsSig, bFittable, par,
+def lookToNextOrderForGaps(obsWl, obsIavg, obsSig, bFittable, sortWl, par,
                            iBinLast, iDer, npts=1):
     if(iDer != 1 and iDer != -1): raise ValueError
     fittingWl = []
     fittingI = []
     fittingSig = []
+    # Get the position of the starting pixel in the sorted wavelengths array
+    # (it is faster to search for the pixel in wavelength thanks to it being sorted)
+    indSortStart = np.searchsorted(obsWl, obsWl[iBinLast], sorter=sortWl)
+    # start searching from the next (sorted) pixel after the input last one
+    indSortStart += iDer
+    
     nptsFound = 0
-    #Run forward or backward (using iDer) looking for the next good bin with a good point
-    indEnd = obsWl.shape[0]
-    if iDer < 0: indEnd = 0
-    binWlStart = obsWl[iBinLast]
-    binWlEnd = binWlStart + iDer*par.velBin/c*binWlStart
-    iBinStart = iBinLast
-    for j in range(iBinLast, indEnd, iDer):
-        #If we are in the wrong part of an overlap,
-        #just update the start index for the search bin, so we search
-        #a continuous (in wl) set of pixels from binWlStart to binWlEnd
-        if (iDer > 0 and obsWl[j] < binWlStart) or (iDer < 0 and obsWl[j] > binWlStart):
-            iBinStart = j
-        #If we hit a bin end for any spectral order
-        if (iDer > 0 and obsWl[j] > binWlEnd) or (iDer < 0 and obsWl[j] < binWlEnd):
-            #(protect against zero size bins)
-            if iBinStart != j:
-                indMax = np.argmax(obsIavg[iBinStart:j:iDer])*iDer + iBinStart
-            else:
-                indMax = j - iDer
-            #If this point is not in an exclude region,
-            # save it and exit the loop
+    # loop untill we find enough points or hit the end of the spectrum
+    while nptsFound < npts and indSortStart >= 0 and indSortStart < len(obsWl):
+        # Define a bin wavelength range (using iDer) to search for a good point
+        binWlStart = obsWl[sortWl[indSortStart]]
+        binWlEnd = binWlStart + iDer*par.velBin/c*binWlStart
+        indSortEnd = np.searchsorted(obsWl, binWlEnd, sorter=sortWl)
+        if indSortStart == indSortEnd: #if there are no points in this bin,
+            # start the next bin from the next point.
+            indSortStart += iDer
+        else:
+            # Get the best point in this bin
+            # (using a slice of the wavelength sorted arrays)
+            subIndMax = np.argmax(obsIavg[sortWl[indSortStart:indSortEnd:iDer]])
+            # (then get the corresponding index in the unsorted arrays)
+            indMax = sortWl[indSortStart:indSortEnd:iDer][subIndMax]
             if bFittable[indMax] == True:
-                inpos = len(fittingWl) # insert points at the end of the list,
-                if iDer < 0: inpos = 0 # or the start, depending on search direction
+                # If this point is not in an exclude region save it
+                nptsFound += 1
+                inpos = 0 # insert points at the start of the list,
+                if iDer > 0: inpos = len(fittingWl) # or the end
                 fittingWl.insert(inpos, obsWl[indMax])
                 fittingI.insert(inpos, obsIavg[indMax])
-                fittingSig += [obsSig[indMax]]
-                nptsFound += 1
-                if nptsFound >= npts: # if we have enough points, quit
-                    return fittingWl, fittingI, fittingSig
-            # Lastly, update for the next velocity bin
-            binWlStart = obsWl[j]
-            binWlEnd = binWlStart + iDer*par.velBin/c*binWlStart
-            iBinStart = j
-
+                fittingSig.insert(inpos, obsSig[indMax])
+            # Set the next bin to start from the end of this one
+            indSortStart = indSortEnd
     return fittingWl, fittingI, fittingSig
-
 
 
 #Get the highest ('most likely continuum') point in each bin
 #The exclude points that are inside an exclude region
-def getBestInBin(obsWl, obsIavg, obsSig, obsOrder, bFittable, par, polyType):
-    fittingWl = np.zeros(obsWl.size + 6) #initialize arrays with a bit of extra space
+def getBestInBin(obsWl, obsIavg, obsSig, ords, bFittable, par, polyType):
+    fittingWl = np.zeros(obsWl.size + 6) #initialize with a bit of extra space
     fittingI = np.zeros(obsWl.size + 6)
     fittingSig = np.zeros(obsWl.size + 6)
-    fittingOrder = np.zeros(obsWl.size + 6, dtype=int)
+    fittingOrder = -np.ones(obsWl.size + 6, dtype=int)
     if polyType == 'Spline':
-        nFillPts = 2
+        neededPts = 4
     elif polyType == 'SmoothSpline':
-        nFillPts = 3
+        neededPts = 5
     else:
-        nFillPts = 1
+        neededPts = 2
+    nFillPts = np.ceil(neededPts/2.).astype(int)
+    obsOrder = ords.obsOrder
+    # Save a sorted ordering of obsWl for use in lookToNextOrderForGaps()
+    sortWl = np.argsort(obsWl)
+    
     # Set up the first velocity bin
     iBinStart = 0
     binWlStart = obsWl[0]
@@ -502,39 +494,44 @@ def getBestInBin(obsWl, obsIavg, obsSig, obsOrder, bFittable, par, polyType):
                 indMax = np.argmax(obsIavg[iBinStart:i]) + iBinStart
             else:
                 indMax = i-1
-            
-            #If the best point in this bin is not in an exclude region
+
+            #If the best point in this bin is not in an exclude region use it
             if bFittable[indMax] == True:
                 fittingWl[nFitPts] = obsWl[indMax]
                 fittingI[nFitPts] = obsIavg[indMax]
                 fittingSig[nFitPts] = obsSig[indMax]
                 fittingOrder[nFitPts] = obsOrder[indMax]
                 nFitPts += 1
-            else:
-                #if the best point is excluded, add a filler point at
-                #the start/end of a spectral order
-                if par.lookToNextOrderForGaps:
-                    tmpWl = []
-                    # Check if this is an order end or an order start
-                    # then run the function to get replacement point(s)
-                    if obsOrder[i] > obsOrder[i-1]: # at an order end
-                        tmpWl, tmpI, tmpSig = lookToNextOrderForGaps(
-                            obsWl, obsIavg, obsSig, bFittable, par,
-                            i-1, 1, nFillPts)
-                    elif obsOrder[iBinStart] > obsOrder[iBinStart-1]: # at an order start
-                        tmpWl, tmpI, tmpSig = lookToNextOrderForGaps(
-                            obsWl, obsIavg, obsSig, bFittable, par,
-                            iBinStart, -1, nFillPts)
-                    # If there are replacement points to use, add them
-                    if len(tmpWl) > 0:
-                        nFillPtsUsed = len(tmpWl)
-                        fittingWl[nFitPts:nFitPts + nFillPtsUsed] = tmpWl
-                        fittingI[nFitPts:nFitPts + nFillPtsUsed] = tmpI
-                        fittingSig[nFitPts:nFitPts + nFillPtsUsed] = tmpSig
-                        fittingOrder[nFitPts:nFitPts + nFillPtsUsed] = obsOrder[indMax]
-                        nFitPts += nFillPtsUsed
-            # Add protection against orders with too few points par.lookToNextOrderForGaps?
-            # (should only happen for Splines and SmoothSpline, when including 1-2 pixel at an order edge
+
+            # If this bin is an order start/end, check if we need to
+            # add extra points from adjacent orders.
+            if par.lookToNextOrderForGaps and (obsOrder[i] > obsOrder[i-1]
+                                or obsOrder[iBinStart] > obsOrder[iBinStart-1]):
+                numPtsInOrder = np.count_nonzero(fittingOrder == obsOrder[iBinStart])
+                tmpWl = []
+                # If this is an order end, and it ended with an excluded point
+                # or there just aren't enough points,
+                # then run the function to get replacement point(s)
+                if (obsOrder[i] > obsOrder[i-1]
+                    and (bFittable[indMax] == False or numPtsInOrder < neededPts)):
+                    nFillPtsEnd = max(nFillPts, neededPts - numPtsInOrder)
+                    tmpWl, tmpI, tmpSig = lookToNextOrderForGaps(
+                        obsWl, obsIavg, obsSig, bFittable, sortWl, par,
+                        i-1, 1, nFillPtsEnd)
+                # If this is an order start, and it started with an excluded point,
+                # then run the function to get replacement point(s)
+                elif (obsOrder[iBinStart] > obsOrder[iBinStart-1]
+                      and bFittable[indMax] == False):
+                    tmpWl, tmpI, tmpSig = lookToNextOrderForGaps(
+                        obsWl, obsIavg, obsSig, bFittable, sortWl, par,
+                        iBinStart, -1, nFillPts)
+                if len(tmpWl) > 0:
+                    nFillPtsUsed = len(tmpWl)
+                    fittingWl[nFitPts:nFitPts + nFillPtsUsed] = tmpWl
+                    fittingI[nFitPts:nFitPts + nFillPtsUsed] = tmpI
+                    fittingSig[nFitPts:nFitPts + nFillPtsUsed] = tmpSig
+                    fittingOrder[nFitPts:nFitPts + nFillPtsUsed] = obsOrder[indMax]
+                    nFitPts += nFillPtsUsed
 
             # And lastly, set up the next velocity bin
             binWlStart = obsWl[i]
@@ -542,10 +539,9 @@ def getBestInBin(obsWl, obsIavg, obsSig, obsOrder, bFittable, par, polyType):
             iBinStart = i
             # If the bin after next would hit an order end, and be too small,
             # then extend this bin's size to avoid very small bins
-            indOrderEnds = np.nonzero(obsOrder > obsOrder[i])[0] - 1
-            if len(indOrderEnds) < 1: indOrderEnds = [-1]
-            wlOrderEnd = obsWl[indOrderEnds[0]]
-            if wlOrderEnd - binWlEnd < 0.33*(par.velBin/c*binWlEnd):
+            indNextOrderEnd = ords.iOrderEnd[ords.iOrderEnd >= iBinStart][0]
+            wlOrderEnd = obsWl[indNextOrderEnd]
+            if wlOrderEnd - binWlEnd < 0.5*(par.velBin/c*binWlEnd):
                 binWlEnd = wlOrderEnd
 
     fittingWl = fittingWl[:nFitPts]
@@ -783,10 +779,5 @@ def writeSpec(fname, nObsCol, *cols):
         for i in range(wl.shape[0]):
             fOut.write('{:10.4f} {:11.4e} {:11.4e} {:11.4e} {:11.4e} {:11.4e}\n'.format(
                 wl[i], obsI[i], cols[2][i], cols[3][i], cols[4][i], cols[5][i]))
-
-    #if nObsCol == 10:
-    #    for i in range(wl.shape[0]):
-    #        fOut.write('{:10.4f} {:11.4e} {:11.4e} {:11.4e} {:11.4e} {:11.4e}\n'.format(
-    #            obsI, cols[1][i], cols[2][i], cols[3][i], cols[4][i], cols[5][i]))
 
     fOut.close()

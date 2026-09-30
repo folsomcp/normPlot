@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "normPlot"
-version = "2.5.0"
+version = "2.6.0"
 authors = [ { name="Colin Folsom", email="fosomcp+dev@gmail.com" },
 ]
 description = "An interactive tool for normalizing stellar spectra"

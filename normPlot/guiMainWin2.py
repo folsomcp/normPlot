@@ -24,10 +24,10 @@ except ImportError: #If this is just running scripts not the full package
 def makeWin(fig, ax, ax2, axDummy, par, polys, ords, obsWl, obsI, obsSig, 
             obsIavg, bFittable, plObs, setPlObsO, setPlPoly, plFitting):
     #Build GUI with tkinter
-    root = tk.Tk(className='norm')
+    root = tk.Tk(className='normPlot')
     #the className seems to set an icon title
     root.title("Normalize spectra")
-    root.iconname("normSpec") #not sure what this does!
+    root.iconname("normPlot") #not sure what this does!
     #(iconname only used by some window managers)
     try:
         imgIcon = tk.Image("photo", file="./iconNorm.png")
@@ -183,7 +183,7 @@ def makeWin(fig, ax, ax2, axDummy, par, polys, ords, obsWl, obsI, obsSig,
     txt_velBin = tk.StringVar()
     txt_velBin.set('{:.0f}'.format(par.velBin))
     changeBinSize = guic.changeBinSize(canvas, txt_velBin, obsWl, obsIavg, 
-                                       obsSig, ords.obsOrder, par, polys,
+                                       obsSig, ords, par, polys,
                                        bFittable, plFitting)
     entryBinSize = ttk.Entry(master=tools, textvariable=txt_velBin, width=6)
     entryBinSize.bind('<Key-Return>', changeBinSize.redoBestInBin)

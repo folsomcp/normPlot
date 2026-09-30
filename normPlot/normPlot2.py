@@ -2,7 +2,7 @@
 #
 # Program for normalizing and plotting an observed spectrum.
 # Can work interactivly with a graphical interface, through matplotlib.
-__version__ = "2.5.0"
+__version__ = "2.6.0"
 
 #User modifiable parameters
 _observationName = 'observed.dat'
@@ -90,10 +90,6 @@ def normplot(observationName, excludeRegionName=_excludeRegionName,
         obsWl, obsI, obsSig = inSpec
     elif nObsCol == 6:
         obsWl, obsI, obsV, obsN1, obsN2, obsSig = inSpec
-    elif nObsCol == 10:
-        obsWl, obsI, obsV, obsN1, obsN2, obsSig = inSpec
-    #elif nObsCol == 30:
-    #    obsWl, obsI, obsSig, obsTel = inSpec
     else:
         print('ERROR: found an unexpected number of columns ({:}) in {:}'.format(
             nObsCol, observationName))
@@ -133,7 +129,7 @@ def normplot(observationName, excludeRegionName=_excludeRegionName,
     
     #Bin in velocity (km/s) units to search for the best continuum point
     fittingWl, fittingI, fittingSig, fittingOrder = ff.getBestInBin(
-        obsWl, obsIavg, obsSig, ords.obsOrder, bFittable, par, polys.type)
+        obsWl, obsIavg, obsSig, ords, bFittable, par, polys.type)
 
     #Fit a polynomial to the selected best continuum points, geting  
     fitIvals = ff.fitPoly(obsWl, ords, fittingOrder, fittingWl, fittingI,
@@ -232,23 +228,6 @@ def normplot(observationName, excludeRegionName=_excludeRegionName,
         merWl = ff.scaleWavelength(merWl, par.outputWavelengthScale)
         merWl = ff.convertAirVacuum(merWl, par.outputConvertAirVac)
         ff.writeSpec(observationName+'.norm', nObsCol, merWl, merI, merV, merN1, merN2, merSig)
-    if nObsCol == 10:
-        merV   = obsV   = obsV/fitIvalsFlat
-        merN1  = obsN1  = obsN1/fitIvalsFlat
-        merN2  = obsN2  = obsN2/fitIvalsFlat
-        merSig = obsSig = np.where(obsSig > 1e9, 10., np.abs(obsSig/fitIvalsFlat))
-        if par.bMergeOrd:
-            merWl, merI, merV, merN1, merN2, merSig = ff.mergeOrders(ords, obsWl, obsI, obsV, obsN1, obsN2, obsSig)
-        merWl = ff.scaleWavelength(merWl, par.outputWavelengthScale)
-        merWl = ff.convertAirVacuum(merWl, par.outputConvertAirVac)
-        ff.writeSpec(observationName+'.norm', 6, merWl, merI, merV, merN1, merN2, merSig)
-    ##Experimental mode including a telluric spectrum.  The telluric spectrum should already be normalized.
-    #if nObsCol == 30:
-    #    if par.bMergeOrd:
-    #        merWl, merI, merTel = ff.mergeOrders(ords, obsWl, obsI, obsTel)
-    #    merWl = ff.scaleWavelength(merWl, par.outputWavelengthScale)
-    #    merWl = ff.convertAirVacuum(merWl, par.outputConvertAirVac)
-    #    ff.writeSpec(observationName+'.norm', 3, merWl, merI, merTel)
 
     return
 
